@@ -1,5 +1,5 @@
 <style>
-    body {
+   body {
     font-family: Arial, sans-serif;
     background-color: #f4f4f4;
     margin: 0;
@@ -20,16 +20,6 @@ h1 {
     margin-bottom: 20px;
 }
 
-form {
-    margin-bottom: 20px;
-}
-
-label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: bold;
-}
-
 input[type="file"] {
     margin-bottom: 20px;
 }
@@ -47,18 +37,22 @@ button:hover {
     background-color: #0056b3;
 }
 
-#download-link {
+#results {
     margin-top: 20px;
 }
 
-#download-link a {
-    text-decoration: none;
-    color: #007bff;
-    font-weight: bold;
+table {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-#download-link a:hover {
-    color: #0056b3;
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+th {
+    background-color: #f4f4f4;
 }
 </style>
 <!DOCTYPE html>
@@ -67,21 +61,64 @@ button:hover {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chapter Header Extractor</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='/static/styles.css') }}">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <h1>Extract Chapter Headers from Text</h1>
-        <form action="/" method="post" enctype="multipart/form-data">
-            <label for="file">Upload your text file:</label>
-            <input type="file" id="file" name="file" required>
-            <button type="submit">Upload and Process</button>
-        </form>
-
-        <div id="download-link">
-            <h2>Download Processed CSV:</h2>
-            <a href="{{ url_for('download_file') }}">Download CSV</a>
-        </div>
+        <input type="file" id="fileInput" accept=".txt">
+        <button onclick="processFile()">Upload and Process</button>
+        <div id="results"></div>
     </div>
+
+    <script>
+        function processFile() {
+            const fileInput = document.getElementById('fileInput');
+            const results = document.getElementById('results');
+
+            if (fileInput.files.length === 0) {
+                results.innerHTML = '<p>No file selected.</p>';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const text = event.target.result;
+                const headers = extractChapterHeaders(text);
+                displayResults(headers);
+            };
+
+            reader.readAsText(file);
+        }
+
+        function extractChapterHeaders(text) {
+            const headers = [];
+            const pattern = /CHAPTER\s+\w+\s*(?:\n\n|\n\s*)([^\n]+)/gi;
+            let match;
+            while (match = pattern.exec(text)) {
+                const header = match[0].trim();
+                const title = match[1].trim();
+                headers.push({header, title});
+            }
+            return headers;
+        }
+
+        function displayResults(headers) {
+            const results = document.getElementById('results');
+            if (headers.length === 0) {
+                results.innerHTML = '<p>No chapters found.</p>';
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Chapter</th><th>Title</th></tr></thead><tbody>';
+            headers.forEach(header => {
+                html += `<tr><td>${header.header}</td><td>${header.title}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            results.innerHTML = html;
+        }
+    </script>
 </body>
 </html>

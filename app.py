@@ -10,7 +10,7 @@ HTML_CONTENT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chapter Header Extractor</title>
+    <title>Citation Extractor</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -71,25 +71,27 @@ HTML_CONTENT = """
 </head>
 <body>
     <div class="container">
-        <h1>Extract Chapter Headers from .txt</h1>
+        <h1>Extract Citations from .txt</h1>
         <form method="POST" enctype="multipart/form-data">
             <input type="file" id="fileInput" name="text_file" accept=".txt" required>
             <button type="submit">Upload and Process</button>
         </form>
-        {% if headers %}
+        {% if citations %}
             <div id="results">
                 <table>
                     <thead>
                         <tr>
-                            <th>Chapter</th>
-                            <th>Title</th>
+                            <th>Author(s)</th>
+                            <th>Year</th>
+                            <th>Page/Paragraph</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for header in headers %}
+                        {% for citation in citations %}
                             <tr>
-                                <td>{{ header.header }}</td>
-                                <td>{{ header.title }}</td>
+                                <td>{{ citation.authors }}</td>
+                                <td>{{ citation.year }}</td>
+                                <td>{{ citation.page }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -101,23 +103,26 @@ HTML_CONTENT = """
 </html>
 """
 
-def extract_chapter_headers(text):
-    headers = []
-    pattern = re.compile(r'CHAPTER\s+\w+\s*(?:\n\n|\n\s*)([^\n]+)', re.IGNORECASE)
+def extract_citations(text):
+    citations = []
+    pattern = re.compile(r'\((?:e\.g\.,?\s*|as in\s*)?(([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?),? (\d{4}|n\.d\.)(?:, (?:p\. \d+|para\. \d+))?(?:; |,?\s*)?)*(?:\[\w+\])?\)|\b([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?)\s*\((\d{4}|n\.d\.)(?:, (?:p\. \d+|para\. \d+))?\)(?:\[\w+\])?', re.IGNORECASE)
     matches = pattern.findall(text)
     for match in matches:
-        headers.append({'header': match.strip(), 'title': match.strip()})
-    return headers
+        authors = match[0] or match[3]
+        year = match[2] or match[4]
+        page = match[1] or match[5]
+        citations.append({'authors': authors.strip(), 'year': year.strip(), 'page': page.strip() if page else ''})
+    return citations
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
-    headers = []
+    citations = []
     if request.method == 'POST':
         text_file = request.files.get('text_file')
         if text_file:
             text = text_file.read().decode('utf-8')
-            headers = extract_chapter_headers(text)
-    return render_template_string(HTML_CONTENT, headers=headers)
+            citations = extract_citations(text)
+    return render_template_string(HTML_CONTENT, citations=citations)
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -110,8 +110,8 @@ def extract_citations(text):
     for match in matches:
         authors = match[0] or match[3]
         year = match[2] or match[4]
-        page = match[1] or match[5]
-        citations.append({'authors': authors.strip(), 'year': year.strip(), 'page': page.strip() if page else ''})
+        page = match[1] or match[5] if (match[1] or match[5]) else ''
+        citations.append({'authors': authors.strip(), 'year': year.strip(), 'page': page.strip()})
     return citations
 
 @app.route('/', methods=['GET', 'POST'])

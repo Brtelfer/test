@@ -25,7 +25,7 @@ HTML_CONTENT = """
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 800px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
@@ -159,7 +159,6 @@ HTML_CONTENT = """
                         <tr>
                             <th>Author(s)</th>
                             <th>Year</th>
-                            <th>Page/Paragraph</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -167,7 +166,6 @@ HTML_CONTENT = """
                             <tr>
                                 <td>{{ citation.authors }}</td>
                                 <td>{{ citation.year }}</td>
-                                <td>{{ citation.page }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>

@@ -105,13 +105,18 @@ HTML_CONTENT = """
 
 def extract_citations(text):
     citations = []
-    pattern = re.compile(r'\((?:e\.g\.,?\s*|as in\s*)?(([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?),? (\d{4}|n\.d\.)(?:, (?:p\. \d+|para\. \d+))?(?:; |,?\s*)?)*(?:\[\w+\])?\)|\b([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?)\s*\((\d{4}|n\.d\.)(?:, (?:p\. \d+|para\. \d+))?\)(?:\[\w+\])?', re.IGNORECASE)
+    pattern = re.compile(r'\(([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?),? (\d{4}|n\.d\.)(?:, (?:p\. \d+|para\. \d+))?\)|\b([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?)\s*\((\d{4}|n\.d\.)(?:, (?:p\. \d+|para\. \d+))?\)', re.IGNORECASE)
     matches = pattern.findall(text)
     for match in matches:
-        authors = match[0] or match[3]
-        year = match[2] or match[4]
-        page = match[1] or match[5] if (match[1] or match[5]) else ''
-        citations.append({'authors': authors.strip(), 'year': year.strip(), 'page': page.strip()})
+        # Debugging information to check the captured groups
+        print(f"Match: {match}")
+        if match[0] or match[3]:
+            authors = match[0] if match[0] else match[3]
+            year = match[1] if match[1] else match[4]
+            page = match[2] if match[2] else match[5] if match[5] else ''
+            citations.append({'authors': authors.strip(), 'year': year.strip(), 'page': page.strip()})
+        else:
+            print(f"Warning: Unexpected match format - {match}")
     return citations
 
 @app.route('/', methods=['GET', 'POST'])

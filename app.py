@@ -1,147 +1,53 @@
-from flask import Flask, request, render_template_string
-import re
+from flask import Flask, request, render_template_string, make_response
+import spacy
+import pandas as pd
+from collections import Counter
+import requests
+from io import StringIO
 
+# Initialize Flask app
 app = Flask(__name__)
 
+# Pre-load spaCy model and frequency data
+print("Loading spaCy model...")
+nlp = spacy.load("en_core_web_sm")
+
+print("Loading frequency data...")
+freq_dict = {}
+try:
+    # Download frequency data
+    url = "https://raw.githubusercontent.com/j-hollander/annotationcode1/main/1Tfreqs.txt"
+    response = requests.get(url)
+    response.raise_for_status()
+    
+    # Process each line
+    for line in StringIO(response.text):
+        parts = line.split()
+        if len(parts) >= 2:
+            freq_dict[parts[0]] = parts[1]
+    print("Frequency data loaded successfully!")
+except Exception as e:
+    print(f"Error loading frequency data: {str(e)}")
+
+# Define DataFrame columns
+column_names = [
+    "Token", "TokenLower", "Lemma", "SourceFile", "POS", "Tag", "Dep", 
+    "Shape", "Alpha", "Stop", "TokenLength", "CorpusFrequency"
+]
+
+# HTML Template (updated for feature extraction)
 HTML_CONTENT = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Citation Extractor</title>
+    <title>Linguistic Feature Extractor</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Inter', sans-serif;
-        }
-
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            padding: 2rem;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 2.5rem;
-        }
-
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 2rem;
-            font-weight: 600;
-            text-align: center;
-            font-size: 2.2rem;
-        }
-
-        .upload-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            text-align: center;
-            border: 2px dashed #ced4da;
-            transition: border-color 0.3s ease;
-        }
-
-        .upload-section:hover {
-            border-color: #4a90e2;
-        }
-
-        .custom-file-input {
-            display: inline-block;
-            background: #4a90e2;
-            color: white;
-            padding: 0.8rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-            font-weight: 500;
-        }
-
-        .custom-file-input:hover {
-            background: #357abd;
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        button[type="submit"] {
-            background: #00c853;
-            color: white;
-            border: none;
-            padding: 0.8rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background 0.3s ease;
-            margin-top: 1rem;
-        }
-
-        button[type="submit"]:hover {
-            background: #009624;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1.5rem;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        th {
-            background: #4a90e2;
-            color: white;
-            padding: 1rem;
-            text-align: left;
-            font-weight: 600;
-        }
-
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid #f0f0f0;
-            color: #2c3e50;
-        }
-
-        tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-
-        #results {
-            margin-top: 2rem;
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .file-name {
-            margin-top: 0.5rem;
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
+        /* ... (keep existing styles unchanged) ... */
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Academic Citation Extractor</h1>
+        <h1>Linguistic Feature Extractor</h1>
         <form method="POST" enctype="multipart/form-data">
             <div class="upload-section">
                 <label class="custom-file-input">
@@ -149,27 +55,15 @@ HTML_CONTENT = """
                     <input type="file" name="text_file" accept=".txt" required>
                 </label>
                 <div class="file-name" id="file-name">No file chosen</div>
-                <button type="submit">Process Document</button>
+                <button type="submit">Extract Features</button>
             </div>
         </form>
-        {% if citations %}
+        {% if message %}
             <div id="results">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Author(s)</th>
-                            <th>Year</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for citation in citations %}
-                            <tr>
-                                <td>{{ citation.authors }}</td>
-                                <td>{{ citation.year }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <p>{{ message }}</p>
+                {% if download_url %}
+                    <p>Download results: <a href="{{ download_url }}">CSV File</a></p>
+                {% endif %}
             </div>
         {% endif %}
     </div>
@@ -184,39 +78,67 @@ HTML_CONTENT = """
 </html>
 """
 
-def extract_citations(text):
-    citations = []
-    # Regex updated to capture page/paragraph in groups 3 and 6
-    pattern = re.compile(
-        r'\(([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?),? (\d{4}|n\.d\.)(?:, (p\. \d+|para\. \d+))?\)'  # Groups 1,2,3
-        r'|'  # OR
-        r'\b([A-Za-z’]+(?:, [A-Za-z’]+)*(?:,? & [A-Za-z’]+)?(?: et al\.)?)\s*\((\d{4}|n\.d\.)(?:, (p\. \d+|para\. \d+))?\)',  # Groups 4,5,6
-        re.IGNORECASE
-    )
-    matches = pattern.findall(text)
-    for match in matches:
-        authors, year, page = '', '', ''
-        # Check which alternative matched based on group1 (index 0) or group4 (index 3)
-        if match[0]:  # First alternative (groups 1,2,3)
-            authors = match[0].strip()
-            year = match[1].strip()
-            page = match[2].strip() if match[2] else ''
-        else:  # Second alternative (groups 4,5,6)
-            authors = match[3].strip()
-            year = match[4].strip()
-            page = match[5].strip() if match[5] else ''
-        citations.append({'authors': authors, 'year': year, 'page': page})
-    return citations
-
 @app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    citations = []
+def index():
     if request.method == 'POST':
-        text_file = request.files.get('text_file')
-        if text_file:
-            text = text_file.read().decode('utf-8')
-            citations = extract_citations(text)
-    return render_template_string(HTML_CONTENT, citations=citations)
+        # Check file upload
+        if 'text_file' not in request.files:
+            return render_template_string(HTML_CONTENT, message="No file uploaded")
+            
+        file = request.files['text_file']
+        if file.filename == '':
+            return render_template_string(HTML_CONTENT, message="No selected file")
+            
+        if not file.filename.endswith('.txt'):
+            return render_template_string(HTML_CONTENT, message="Invalid file type. Please upload a .txt file")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+        try:
+            # Read and preprocess text
+            text = file.read().decode('utf-8')
+            text = text.replace("\n\n", " ").replace("\n", " ")
+            
+            # Process text with spaCy
+            doc = nlp(text)
+            
+            # Build token data
+            data = []
+            for token in doc:
+                token_lower = token.text.lower()
+                data.append([
+                    token.text,
+                    token_lower,
+                    token.lemma_,
+                    file.filename,
+                    token.pos_,
+                    token.tag_,
+                    token.dep_,
+                    token.shape_,
+                    token.is_alpha,
+                    token.is_stop,
+                    len(token.text),
+                    freq_dict.get(token_lower, "N/A")  # Use .get() to handle missing keys
+                ])
+            
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=column_names)
+            df["TokenCumulFreq"] = df.groupby('TokenLower').cumcount() + 1
+            df["LemmaCumulFreq"] = df.groupby('Lemma').cumcount() + 1
+            token_freq = Counter(df["TokenLower"])
+            df['WordTotN'] = df['TokenLower'].map(token_freq)
+            df.index.name = 'TokenIndex'
+
+            # Create CSV response
+            csv_output = df.to_csv(index=True)
+            response = make_response(csv_output)
+            response.headers['Content-Disposition'] = f'attachment; filename={file.filename.replace(".txt", "_features.csv")}'
+            response.headers['Content-type'] = 'text/csv'
+            return response
+            
+        except Exception as e:
+            return render_template_string(HTML_CONTENT, message=f"Processing error: {str(e)}")
+
+    # GET request - show upload form
+    return render_template_string(HTML_CONTENT)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
